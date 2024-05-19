@@ -1,0 +1,44 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - master
+
+env:
+  HUSKY: 0 # https://typicode.github.io/husky/how-to.html#ci-server-and-docker
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+
+# Needed for nx-set-shas within nx-cloud-main.yml, when run on the master branch
+permissions:
+  actions: read
+  contents: write
+  deployments: write
+  pull-requests: write
+  id-token: write
+
+jobs:
+  Process:
+    runs-on: ubuntu-latest
+
+    outputs:
+      # key used if release-please is configured to track a single deliverable
+      release_created: ${{ steps.release-please.outputs.release_created }}
+      tag_name: ${{ steps.release-please.outputs.tag_name }}
+      version_sha: ${{ steps.release-please.outputs.sha }}
+
+    steps:
+      - uses: google-github-actions/release-please-action@v4
+        id: release-please
+        with:
+          token: ${{secrets.RELEASE_PLEASE_TOKEN}}
+          release-type: simple
+      - name: Print Release Data
+        run: |
+          echo 'Release Data:'
+
+          echo '''
+            ${{ toJSON(steps.release-please.outputs) }}
+          '''
