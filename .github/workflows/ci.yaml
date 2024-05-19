@@ -1,0 +1,41 @@
+---
+# SPDX-FileCopyrightText: © 2018 Stefano Zacchiroli <zack@upsilon.cc>
+# SPDX-FileCopyrightText: © 2018 Martin Michlmayr <tbm@cyrius.com>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+name: CI
+
+on:
+  pull_request:
+
+concurrency:
+    group: ${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: true
+
+# Needed for nx-set-shas within nx-cloud-main.yml, when run on the master branch
+permissions:
+  actions: read
+  contents: read
+
+
+jobs:
+
+  LintShellScripts:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Add Shellcheck matcher
+        run: echo "::add-matcher::./.github/problem-matchers/shellcheck-gcc.json"
+
+      - name: Lint Shellscripts
+        uses: ludeeus/action-shellcheck@cd81f4475ab741e097ec0fe73b692f3e49d66b8c
+        with:
+          check_together: 'yes'
+          severity: error
+
+      - name: Remove Shellcheck matcher
+        if: always()
+        run: echo "::remove-matcher owner=shellcheck-gcc::"

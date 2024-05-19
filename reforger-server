@@ -1,0 +1,166 @@
+#!/bin/bash
+
+VERSION="0.1.0" #release_please_version
+SERVER_CONFIG_PATH="${HOME}/Documents/My Games/ArmaReforger/serverConfigs/"
+SERVER_PROFILE_PATH="${HOME}/Documents/My Games/ArmaReforger/serverProfiles/"
+SERVER_ADDON_PATH="${HOME}/Documents/My Games/ArmaReforger/addons/"
+
+
+#
+# Check for required commands
+requires_command() {
+    if ! command -v "$1" &>/dev/null; then
+        echo "This script requires $1 to be installed."
+        echo "For more information, see: $2"
+        exit 1
+    fi
+}
+
+#
+# Check for required arguments
+requires_arg() {
+    if [ -z "$1" ]; then
+        echo "Missing required argument: $2"
+        exit 1
+    fi
+}
+
+
+#
+# Build the server arguments
+# merge it with defaults.
+get_server_arguments(){
+    local defaults
+
+    defaults=(
+        "-addonsDir ${SERVER_ADDON_PATH}"
+        "-addonDownloadDir ${SERVER_ADDON_PATH}"
+        "-backendlog"
+        "-nothrow"
+        "-maxFPS 60"
+    )
+
+    # we only want unique values
+    # loop through the args and replace the defaults
+    # for each arg it might have a value, so we need to remove it
+    for arg in "${@}"; do
+        for default in "${defaults[@]}"; do
+            arg_key=$(echo "${arg}" | cut -d' ' -f1)
+            default_key=$(echo "${default}" | cut -d' ' -f1)
+
+            if [ "${arg_key}" == "${default_key}" ]; then
+                # remove the default
+                defaults=("${defaults[@]/$default}")
+            fi
+        done
+    done
+
+    # return the defaults and the args
+    echo "${defaults[*]} ${*}"
+}
+
+#
+# Get a list of server configs
+get_server_configs(){
+    find "${SERVER_CONFIG_PATH}" \
+        -type f \
+        -name "*.json" | sort
+}
+
+#
+# Filter the full path to just the filename
+filter_relative_names() {
+    while read -r line; do
+        basename "${line}"
+    done
+}
+
+#
+# List and preview files with fzf
+# accepts a list from stdin
+list_and_preview_files() {
+    fzf \
+        --bind "enter:execute(cat {})" \
+        --bind "e:execute($EDITOR {})" \
+        --preview "cat {}" \
+        --delimiter / --with-nth -1
+}
+
+#
+# Pick a server config with fzf
+pick_server_config(){
+    local config
+    config=$(get_server_configs | filter_relative_names | fzf --preview "cat {}")
+    echo "${config}"
+}
+
+#
+# Get the full path to a server profile
+get_server_profile() {
+    local config_name="${1}"
+
+    # profile name is the config filename without the extension
+    without_extension=$(basename "${config_name}" .json)
+
+    echo "${SERVER_PROFILE_PATH}${without_extension}"
+
+}
+
+#
+# Launch the server using some defaults and the provided arguments
+run_server() {
+    cd "$HOME/.local/share/Steam/steamapps/common/Arma Reforger Server" || exit 1
+    "./ArmaReforgerServer" "${@}"
+}
+
+
+#
+# Command functions
+#
+
+#
+# List the server configs
+cmd_list(){
+    # loop throw the configs and only print the filename
+    get_server_configs | list_and_preview_files
+}
+
+#
+# Start the server
+cmd_serve(){
+    local config_name
+    local full_config_path
+    local full_profile_path
+    local arguments
+
+    config_name="${1:-$(pick_server_config)}"
+    full_config_path="${SERVER_CONFIG_PATH}${config_name}"
+    full_profile_path=$(get_server_profile "${config_name}")
+
+    arguments=(
+        "-config ${full_config_path}"
+        "-profile=${full_profile_path}"
+    )
+
+    echo "Using config: ${config_name}"
+
+    run_server "$(get_server_arguments "${arguments[@]}")"
+}
+
+requires_command fzf "https://github.com/junegunn/fzf"
+
+case "$1" in
+    serve)
+        cmd_serve "${@:2}"
+        ;;
+    list)
+        cmd_list "${@:2}"
+        ;;
+    *)
+        echo "Arma Reforger Server Launcher v${VERSION}"
+        echo "Usage: $0 {serve|list}"
+        echo "  serve [config] - Start the server with the given config. If no config provided, will prompt for one."
+        echo "  list - List all available server configs."
+        exit 1
+        ;;
+esac
