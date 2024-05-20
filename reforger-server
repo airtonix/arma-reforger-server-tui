@@ -68,6 +68,26 @@ get_server_configs(){
 }
 
 #
+# Get the full path to a server profile
+get_server_profile() {
+    local config_name="${1}"
+    local output
+    local without_extension
+
+    # profile name is the config filename without the extension
+    without_extension=$(basename "${config_name}" .json)
+    output="${SERVER_PROFILE_PATH}${without_extension}"
+
+    # if the profile doesn't exist, create it
+    if [ ! -d "${output}" ]; then
+        mkdir -p "${output}"
+    fi
+    
+    echo "${output}"
+
+}
+
+#
 # Filter the full path to just the filename
 filter_relative_names() {
     while read -r line; do
@@ -79,32 +99,35 @@ filter_relative_names() {
 # List and preview files with fzf
 # accepts a list from stdin
 list_and_preview_files() {
+    local preview_cmd
+
+    header="${1:-Available Server Configs}"
+
+    preview_cmd="cat {}"
+    if command -v bat &>/dev/null; then
+        preview_cmd="bat --color=always {}"
+    fi
+
     fzf \
-        --bind "enter:execute(cat {})" \
         --bind "e:execute($EDITOR {})" \
-        --preview "cat {}" \
-        --delimiter / --with-nth -1
+        --preview "${preview_cmd}" \
+        --delimiter / \
+        --with-nth -1 \
+        --layout=reverse \
+        --info=inline \
+        --header "${header}" 
 }
 
 #
 # Pick a server config with fzf
 pick_server_config(){
     local config
-    config=$(get_server_configs | filter_relative_names | fzf --preview "cat {}")
+    config=$(\
+        get_server_configs \
+        | list_and_preview_files "Select a server config")
     echo "${config}"
 }
 
-#
-# Get the full path to a server profile
-get_server_profile() {
-    local config_name="${1}"
-
-    # profile name is the config filename without the extension
-    without_extension=$(basename "${config_name}" .json)
-
-    echo "${SERVER_PROFILE_PATH}${without_extension}"
-
-}
 
 #
 # Launch the server using some defaults and the provided arguments
@@ -133,16 +156,17 @@ cmd_serve(){
     local full_profile_path
     local arguments
 
-    config_name="${1:-$(pick_server_config)}"
-    full_config_path="${SERVER_CONFIG_PATH}${config_name}"
-    full_profile_path=$(get_server_profile "${config_name}")
+    full_config_path="${1:-$(pick_server_config)}"
+    full_profile_path=$(get_server_profile "${full_config_path}")
+
+    echo "Using Config: ${full_config_path}"
+    echo "Using Profile: ${full_profile_path}"
 
     arguments=(
         "-config ${full_config_path}"
         "-profile=${full_profile_path}"
     )
 
-    echo "Using config: ${config_name}"
 
     run_server "$(get_server_arguments "${arguments[@]}")"
 }
