@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.1](https://github.com/airtonix/arma-reforger-server-tui/compare/v1.0.0...v1.0.1) (2024-05-20)
+
+
+### Bug Fixes
+
+* update release action ([#4](https://github.com/airtonix/arma-reforger-server-tui/issues/4)) ([07b1d57](https://github.com/airtonix/arma-reforger-server-tui/commit/07b1d579a2751fe1f7217874abf19f2987a599a8))
+
 ## 1.0.0 (2024-05-20)
 
 
